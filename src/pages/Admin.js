@@ -172,7 +172,17 @@ const ProductsPanel = () => {
     try {
       const res = await adminService.hideProduct(productId);
       setMsg(res.data.message);
-      load(search);
+      // Actualizar el producto en el estado local directamente con la respuesta
+      // del servidor — sin necesidad de recargar toda la lista
+      const updated = res.data.product;
+      if (updated) {
+        setProducts(prev => prev.map(p => p.id === productId ? updated : p));
+      } else {
+        // Fallback: toggle optimista si el server no retorna el producto
+        setProducts(prev => prev.map(p =>
+          p.id === productId ? { ...p, hidden: !p.hidden } : p
+        ));
+      }
     } catch (err) {
       setMsg(err.response?.data?.error || 'Error al ocultar/mostrar');
     }

@@ -172,11 +172,51 @@ const ProductDetail = () => {
   const [addedToCart, setAddedToCart]     = useState(false);
   const [showReport, setShowReport]       = useState(false);
   const [contacting, setContacting]       = useState(false);
+  // Estado para producto oculto por admin
+  const [hiddenByAdmin, setHiddenByAdmin] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
 
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Polling: cada 20 segundos verificar si el producto fue ocultado por admin
+  // mientras el usuario lo estaba viendo
+  useEffect(() => {
+    if (!product) return;
+    const interval = setInterval(async () => {
+      try {
+        await productService.getById(id);
+        // Sigue disponible — no hacer nada
+      } catch (err) {
+        if (err.response?.status === 404) {
+          // El producto fue eliminado u ocultado
+          clearInterval(interval);
+          setHiddenByAdmin(true);
+        }
+      }
+    }, 20000); // cada 20 segundos
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id]);
+
+  // Cuenta regresiva + redirección cuando el producto está oculto
+  useEffect(() => {
+    if (!hiddenByAdmin) return;
+    setRedirectCountdown(3);
+    const tick = setInterval(() => {
+      setRedirectCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(tick);
+          navigate('/listing');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [hiddenByAdmin, navigate]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -205,7 +245,13 @@ const ProductDetail = () => {
           setHasCompletedPurchase(false);
         }
       }
-    } catch {
+    } catch (err) {
+      // Producto oculto por admin: mostrar pantalla específica en lugar de redirigir a /
+      if (err.response?.data?.hidden || err.response?.status === 404) {
+        setHiddenByAdmin(true);
+        setLoading(false);
+        return;
+      }
       navigate('/');
     } finally {
       setLoading(false);
@@ -237,6 +283,36 @@ const ProductDetail = () => {
   };
 
   if (loading) return <div className="flex-center" style={{ minHeight: '60vh' }}><div className="spinner" /></div>;
+
+  // Pantalla de producto no disponible (oculto por admin)
+  if (hiddenByAdmin) {
+    return (
+      <div
+        className="flex-center"
+        style={{
+          minHeight: '60vh',
+          flexDirection: 'column',
+          gap: 16,
+          textAlign: 'center',
+          padding: '2rem',
+        }}
+      >
+        <div style={{ fontSize: 64 }}>🚫</div>
+        <h2 style={{ margin: 0 }}>Producto no disponible</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 360 }}>
+          Este producto ha sido retirado del catálogo por el administrador
+          y ya no está disponible para su compra.
+        </p>
+        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
+          Redirigiendo al catálogo en <strong>{redirectCountdown}</strong> segundo{redirectCountdown !== 1 ? 's' : ''}...
+        </p>
+        <button className="btn btn-primary" onClick={() => navigate('/listing')}>
+          Ver otros productos
+        </button>
+      </div>
+    );
+  }
+
   if (!product) return null;
 
   const isOwner = user?.id === product.sellerId;
