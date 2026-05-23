@@ -1,22 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/api';
 import { validators, validateForm } from '../utils/validators';
 import './Profile.css';
 
+// Estrellitas estáticas para mostrar rating
+const Stars = ({ rating }) => {
+  const full = Math.round(rating || 0);
+  return (
+    <span>
+      {[1, 2, 3, 4, 5].map(i => (
+        <span key={i} style={{ color: i <= full ? '#C9A84C' : '#ddd', fontSize: 18 }}>★</span>
+      ))}
+    </span>
+  );
+};
+
 const Profile = () => {
-  const { user, logout, isSeller, leaveSeller } = useAuth();
+  const { user, logout, isSeller, leaveSeller, updateLocalUser } = useAuth();
   const navigate = useNavigate();
 
   const [tab, setTab] = useState('info');
-  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
-  const [pwErrors, setPwErrors] = useState({});
+
+  // ── Formulario editar perfil ──────────────────────────────────────────────
+  const [editForm, setEditForm]     = useState({ name: '', career: '', photo: '' });
+  const [editErrors, setEditErrors] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSuccess, setEditSuccess] = useState(false);
+
+  // ── Calificación del vendedor (si aplica) ─────────────────────────────────
+  const [sellerRating, setSellerRating] = useState(null);
+  const [ratingLoaded, setRatingLoaded] = useState(false);
+
+  // ── Cambiar contraseña ────────────────────────────────────────────────────
+  const [pwForm, setPwForm]       = useState({ current: '', next: '', confirm: '' });
+  const [pwErrors, setPwErrors]   = useState({});
   const [pwLoading, setPwLoading] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(false);
-  const [leaveLoading, setLeaveLoading] = useState(false);
-  const [leaveMsg, setLeaveMsg] = useState('');
 
+  // ── Dejar de ser vendedor ─────────────────────────────────────────────────
+  const [leaveLoading, setLeaveLoading] = useState(false);
+  const [leaveMsg, setLeaveMsg]         = useState('');
+
+  // Inicializar formulario de edición con datos actuales
+  useEffect(() => {
+    if (user) {
+      setEditForm({
+        name:   user.name   || '',
+        career: user.career || '',
+        photo:  user.photo  || '',
+      });
+    }
+  }, [user]);
+
+  // Cargar rating del vendedor al abrir la pestaña de info
+  useEffect(() => {
+    if (tab === 'info' && isSeller() && !ratingLoaded) {
+      authService.getProfile()
+        .then(res => {
+          setSellerRating(res.data.user?.sellerRating ?? null);
+          setRatingLoaded(true);
+        })
+        .catch(() => setRatingLoaded(true));
+    }
+  }, [tab, isSeller, ratingLoaded]);
+
+  // ── Handlers editar perfil ────────────────────────────────────────────────
+  const setEdit = (field) => (e) => {
+    setEditForm(f => ({ ...f, [field]: e.target.value }));
+    if (editErrors[field]) setEditErrors(p => ({ ...p, [field]: null }));
+    setEditSuccess(false);
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    const rules = {
+      name: [v => validators.required(v, 'Nombre')],
+    };
+    const { isValid, errors } = validateForm(editForm, rules);
+    if (!isValid) { setEditErrors(errors); return; }
+
+    setEditLoading(true);
+    try {
+      const res = await authService.updateProfile({
+        name:   editForm.name.trim(),
+        career: editForm.career.trim() || null,
+        photo:  editForm.photo.trim()  || null,
+      });
+      // Actualizar el contexto de autenticación con los nuevos datos
+      if (res.data.user) updateLocalUser(res.data.user);
+      setEditSuccess(true);
+    } catch (err) {
+      setEditErrors({ name: err.response?.data?.error || 'Error al actualizar el perfil.' });
+    }
+    setEditLoading(false);
+  };
+
+  // ── Handlers contraseña ───────────────────────────────────────────────────
   const setPw = (field) => (e) => {
     setPwForm(f => ({ ...f, [field]: e.target.value }));
     if (pwErrors[field]) setPwErrors(p => ({ ...p, [field]: null }));
@@ -27,7 +108,7 @@ const Profile = () => {
     e.preventDefault();
     const rules = {
       current: [v => validators.required(v, 'Contraseña actual')],
-      next: [v => validators.required(v, 'Nueva contraseña'), v => validators.minLength(v, 6, 'Nueva contraseña')],
+      next:    [v => validators.required(v, 'Nueva contraseña'), v => validators.minLength(v, 6, 'Nueva contraseña')],
       confirm: [v => validators.match(v, pwForm.next, 'Las contraseñas')],
     };
     const { isValid, errors } = validateForm(pwForm, rules);
@@ -44,10 +125,7 @@ const Profile = () => {
     setPwLoading(false);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
+  const handleLogout = () => { logout(); navigate('/'); };
 
   const handleLeaveSeller = async () => {
     if (!window.confirm('¿Seguro que quieres dejar de ser vendedor? Perderás acceso a publicar productos.')) return;
@@ -80,17 +158,50 @@ const Profile = () => {
         {/* Sidebar */}
         <div className="profile-sidebar">
           <div className="profile-avatar-wrap">
-            <div className="profile-avatar">
-              {(user?.name || 'U').charAt(0).toUpperCase()}
-            </div>
+            {user?.photo ? (
+              <img
+                src={user.photo}
+                alt={user.name}
+                className="profile-avatar"
+                style={{ objectFit: 'cover', borderRadius: '50%' }}
+                onError={e => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <div className="profile-avatar">
+                {(user?.name || 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="profile-role-badge">{roleIcon()} {roleLabel()}</div>
           </div>
           <h2 className="profile-name">{user?.name}</h2>
           <p className="profile-email">{user?.email}</p>
+          {user?.career && (
+            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '2px 0 0' }}>{user.career}</p>
+          )}
+
+          {/* Rating del vendedor en el sidebar */}
+          {isSeller() && ratingLoaded && (
+            <div style={{ marginTop: 8, textAlign: 'center' }}>
+              {sellerRating !== null ? (
+                <div>
+                  <Stars rating={sellerRating} />
+                  <div style={{ fontSize: 13, color: '#C9A84C', fontWeight: 600 }}>
+                    {sellerRating.toFixed(1)} / 5
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Calificación como vendedor</div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>Sin calificación pública aún</div>
+              )}
+            </div>
+          )}
 
           <nav className="profile-nav">
             <button className={`profile-nav-item ${tab === 'info' ? 'active' : ''}`} onClick={() => setTab('info')}>
               👤 Mi información
+            </button>
+            <button className={`profile-nav-item ${tab === 'edit' ? 'active' : ''}`} onClick={() => setTab('edit')}>
+              ✏️ Editar perfil
             </button>
             <button className={`profile-nav-item ${tab === 'password' ? 'active' : ''}`} onClick={() => setTab('password')}>
               🔒 Cambiar contraseña
@@ -114,6 +225,8 @@ const Profile = () => {
 
         {/* Content */}
         <div className="profile-content">
+
+          {/* ── TAB: Mi información ─────────────────────────────────────────── */}
           {tab === 'info' && (
             <div className="profile-card">
               <h2 className="profile-card-title">Mi información</h2>
@@ -126,6 +239,12 @@ const Profile = () => {
                   <label>Correo institucional</label>
                   <div className="profile-info-value">{user?.email}</div>
                 </div>
+                {user?.career && (
+                  <div className="profile-info-item">
+                    <label>Carrera</label>
+                    <div className="profile-info-value">{user.career}</div>
+                  </div>
+                )}
                 <div className="profile-info-item">
                   <label>Rol en el marketplace</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -146,10 +265,24 @@ const Profile = () => {
                     </div>
                   )}
                 </div>
-                {user?.career && (
+
+                {/* Rating del vendedor en la tarjeta de info (TRD §4.5) */}
+                {isSeller() && ratingLoaded && (
                   <div className="profile-info-item">
-                    <label>Carrera</label>
-                    <div className="profile-info-value">{user.career}</div>
+                    <label>Calificación como vendedor</label>
+                    {sellerRating !== null ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Stars rating={sellerRating} />
+                        <span style={{ fontWeight: 700, color: '#C9A84C', fontSize: 16 }}>
+                          {sellerRating.toFixed(1)}
+                        </span>
+                        <span style={{ fontSize: 12, color: 'var(--muted)' }}>/ 5</span>
+                      </div>
+                    ) : (
+                      <div className="profile-info-value" style={{ color: 'var(--muted)', fontSize: 13 }}>
+                        Sin calificación pública aún (se requieren ≥20 reseñas)
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -182,6 +315,69 @@ const Profile = () => {
             </div>
           )}
 
+          {/* ── TAB: Editar perfil ──────────────────────────────────────────── */}
+          {tab === 'edit' && (
+            <div className="profile-card">
+              <h2 className="profile-card-title">Editar perfil</h2>
+              {editSuccess && (
+                <div className="alert alert-success">✅ Perfil actualizado correctamente.</div>
+              )}
+              <form onSubmit={handleUpdateProfile} noValidate>
+                <div className="form-group">
+                  <label className="form-label">Nombre completo</label>
+                  <input
+                    type="text"
+                    className={`input ${editErrors.name ? 'error' : ''}`}
+                    value={editForm.name}
+                    onChange={setEdit('name')}
+                    placeholder="Tu nombre completo"
+                    maxLength={100}
+                  />
+                  {editErrors.name && <span className="form-error">{editErrors.name}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Carrera <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(opcional)</span></label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={editForm.career}
+                    onChange={setEdit('career')}
+                    placeholder="Ej: Ingeniería Industrial, Derecho..."
+                    maxLength={150}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Foto de perfil <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(URL — opcional)</span></label>
+                  <input
+                    type="url"
+                    className={`input ${editErrors.photo ? 'error' : ''}`}
+                    value={editForm.photo}
+                    onChange={setEdit('photo')}
+                    placeholder="https://..."
+                  />
+                  {editErrors.photo && <span className="form-error">{editErrors.photo}</span>}
+                  {editForm.photo && /^https?:\/\/.+/.test(editForm.photo) && (
+                    <div style={{ marginTop: 8 }}>
+                      <img
+                        src={editForm.photo}
+                        alt="preview"
+                        style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border)' }}
+                        onError={e => { e.target.style.display = 'none'; }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <button type="submit" className="btn btn-primary" disabled={editLoading}>
+                  {editLoading ? 'Guardando...' : '💾 Guardar cambios'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* ── TAB: Cambiar contraseña ─────────────────────────────────────── */}
           {tab === 'password' && (
             <div className="profile-card">
               <h2 className="profile-card-title">Cambiar contraseña</h2>

@@ -38,13 +38,13 @@ api.interceptors.response.use(
 
 // Servicios de autenticación
 export const authService = {
-  register: (data) => api.post('/auth/register', data),
-  login: (data) => api.post('/auth/login', data),
-  getProfile: () => api.get('/auth/profile'),
-  updateProfile: (data) => api.put('/auth/profile', data),
-  changePassword: (data) => api.put('/auth/change-password', data),
-  becomeSeller: () => api.post('/auth/become-seller'),
-  leaveSeller:  () => api.post('/auth/leave-seller'),
+  register:        (data) => api.post('/auth/register', data),
+  login:           (data) => api.post('/auth/login', data),
+  getProfile:      ()     => api.get('/auth/profile'),
+  updateProfile:   (data) => api.put('/auth/profile', data),
+  changePassword:  (data) => api.put('/auth/change-password', data),
+  becomeSeller:    ()     => api.post('/auth/become-seller'),
+  leaveSeller:     ()     => api.post('/auth/leave-seller'),
 };
 
 // Servicios de productos
