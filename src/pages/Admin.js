@@ -263,6 +263,7 @@ const ProductsPanel = () => {
 const ReportsPanel = () => {
   const [reports, setReports] = useState([]);
   const [msg, setMsg]         = useState('');
+  const [filter, setFilter]   = useState('pending'); // 'all' | 'pending' | 'resolved'
 
   useEffect(() => {
     adminService.getReports()
@@ -282,24 +283,127 @@ const ReportsPanel = () => {
     }
   };
 
+  const pending  = reports.filter(r => r.status !== 'resolved');
+  const resolved = reports.filter(r => r.status === 'resolved');
+  const visible  = filter === 'all' ? reports : filter === 'pending' ? pending : resolved;
+
+  const tabStyle = (name) => ({
+    padding: '6px 16px',
+    border: '1px solid #ccc',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontWeight: filter === name ? 700 : 400,
+    background: filter === name ? '#1a3a6b' : '#f4f6fb',
+    color: filter === name ? '#fff' : '#333',
+    marginRight: 6,
+  });
+
+  const typeIcon = (t) => t === 'product' ? '📦' : '👤';
+  const typeLabel = (t) => t === 'product' ? 'Producto' : 'Usuario';
+
   return (
     <div>
       <h2>Reportes</h2>
-      {msg && <p><strong>{msg}</strong></p>}
-      <ul>
-        {reports.map(r => (
-          <li key={r.id}>
-            <strong>{r.targetType === 'product' ? 'Producto' : 'Usuario'}</strong>
-            {' '}— Motivo: {r.reason} — Estado: {r.status}
-            {' '}— Fecha: {new Date(r.createdAt).toLocaleDateString('es-CO')}
-            <br />
-            {r.status !== 'resolved' && (
-              <button onClick={() => handleResolve(r.id)}>Resolver</button>
-            )}
-          </li>
-        ))}
-        {reports.length === 0 && <li>Sin reportes.</li>}
-      </ul>
+      {msg && <p style={{ color: '#1A7A3A', fontWeight: 600 }}>{msg}</p>}
+
+      {/* Filtros */}
+      <div style={{ marginBottom: 16 }}>
+        <button style={tabStyle('pending')} onClick={() => setFilter('pending')}>
+          🔴 Pendientes ({pending.length})
+        </button>
+        <button style={tabStyle('resolved')} onClick={() => setFilter('resolved')}>
+          ✅ Resueltos ({resolved.length})
+        </button>
+        <button style={tabStyle('all')} onClick={() => setFilter('all')}>
+          Todos ({reports.length})
+        </button>
+      </div>
+
+      {/* Lista */}
+      {visible.length === 0 ? (
+        <p style={{ color: '#888' }}>
+          {filter === 'pending' ? 'No hay reportes pendientes. ✅' : 'Sin resultados.'}
+        </p>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {visible.map(r => (
+            <li key={r.id} style={{
+              border: '1px solid #e0e0e0',
+              borderLeft: `4px solid ${r.status === 'resolved' ? '#1A7A3A' : '#c0392b'}`,
+              borderRadius: 8,
+              padding: '12px 16px',
+              marginBottom: 10,
+              background: r.status === 'resolved' ? '#f8fff9' : '#fff',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 10px',
+                    borderRadius: 12,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    background: r.targetType === 'product' ? '#EEF2FF' : '#FFF3E0',
+                    color: r.targetType === 'product' ? '#2C5FA8' : '#E65100',
+                    marginRight: 8,
+                  }}>
+                    {typeIcon(r.targetType)} {typeLabel(r.targetType)}
+                  </span>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 10px',
+                    borderRadius: 12,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    background: r.status === 'resolved' ? '#E8F5E9' : '#FFEBEE',
+                    color: r.status === 'resolved' ? '#1A7A3A' : '#c0392b',
+                  }}>
+                    {r.status === 'resolved' ? '✅ Resuelto' : '🔴 Pendiente'}
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: '#888' }}>
+                  {r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-CO') : ''}
+                </span>
+              </div>
+
+              <div style={{ marginTop: 8, fontSize: 14 }}>
+                <strong>Motivo:</strong> {r.reason}
+              </div>
+
+              {r.targetId && (
+                <div style={{ marginTop: 4, fontSize: 12, color: '#888' }}>
+                  ID del reportado: <code>{r.targetId}</code>
+                </div>
+              )}
+
+              {r.status === 'resolved' && r.resolvedAt && (
+                <div style={{ marginTop: 4, fontSize: 12, color: '#1A7A3A' }}>
+                  Resuelto el {new Date(r.resolvedAt).toLocaleDateString('es-CO')}
+                </div>
+              )}
+
+              {r.status !== 'resolved' && (
+                <button
+                  onClick={() => handleResolve(r.id)}
+                  style={{
+                    marginTop: 10,
+                    padding: '5px 14px',
+                    background: '#1a3a6b',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: 13,
+                  }}
+                >
+                  ✅ Marcar como resuelto
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

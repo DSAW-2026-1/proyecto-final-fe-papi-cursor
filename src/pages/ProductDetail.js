@@ -171,6 +171,7 @@ const ProductDetail = () => {
   const [quantity, setQuantity]           = useState(1);
   const [addedToCart, setAddedToCart]     = useState(false);
   const [showReport, setShowReport]       = useState(false);
+  const [showUserReport, setShowUserReport] = useState(false);
   const [contacting, setContacting]       = useState(false);
   // Estado para producto oculto por admin
   const [hiddenByAdmin, setHiddenByAdmin] = useState(false);
@@ -376,7 +377,7 @@ const ProductDetail = () => {
           {product.seller && (
             <div className="pd-seller">
               <div className="pd-seller-avatar">👤</div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div className="pd-seller-name">{product.seller.name}</div>
                 <div className="pd-seller-email">{product.seller.email}</div>
 
@@ -397,6 +398,17 @@ const ProductDetail = () => {
                   </div>
                 )}
               </div>
+              {/* Botón reportar vendedor (solo para otros usuarios autenticados) */}
+              {isAuthenticated && !isOwner && (
+                <button
+                  className="pd-report-link"
+                  style={{ alignSelf: 'flex-start', marginTop: 0 }}
+                  onClick={() => setShowUserReport(true)}
+                  title="Reportar vendedor"
+                >
+                  🚩 Reportar
+                </button>
+              )}
             </div>
           )}
 
@@ -546,6 +558,13 @@ const ProductDetail = () => {
           target="product"
           targetId={product.id}
           onClose={() => setShowReport(false)}
+        />
+      )}
+      {showUserReport && (
+        <ReportModal
+          target="user"
+          targetId={product.sellerId}
+          onClose={() => setShowUserReport(false)}
         />
       )}
     </div>

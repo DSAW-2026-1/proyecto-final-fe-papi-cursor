@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { validators, validateForm, sanitize } from '../utils/validators';
 import './Auth.css';
 
 const CAREERS = [
@@ -21,33 +22,42 @@ const AuthFeature = ({ icon, title, desc }) => (
 
 const Register = () => {
   const [form, setForm] = useState({ name: '', email: '', career: '', password: '', confirm: '' });
+  const [errors, setErrors] = useState({});
   const [showPw, setShowPw] = useState(false);
   const [terms, setTerms] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
+  const set = (field) => (e) => {
+    setForm(f => ({ ...f, [field]: e.target.value }));
+    if (errors[field]) setErrors(p => ({ ...p, [field]: null }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setErrors({});
 
-    if (form.name.length < 3) { setError('Ingresa tu nombre completo (mínimo 3 caracteres)'); return; }
-    if (!form.email.endsWith('@unisabana.edu.co')) { setError('Solo se permiten correos @unisabana.edu.co'); return; }
-    if (!form.career) { setError('Selecciona tu carrera'); return; }
-    if (form.password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres'); return; }
-    if (form.password !== form.confirm) { setError('Las contraseñas no coinciden'); return; }
-    if (!terms) { setError('Debes aceptar el reglamento para continuar'); return; }
+    // Validación con validators.js (sanitizando inputs primero)
+    const rules = {
+      name:     [v => validators.required(v, 'Nombre'), v => validators.minLength(v, 3, 'Nombre')],
+      email:    [v => validators.required(v, 'Correo'), v => validators.unisabanaEmail(v)],
+      career:   [v => validators.required(v, 'Carrera')],
+      password: [v => validators.required(v, 'Contraseña'), v => validators.minLength(v, 6, 'Contraseña')],
+      confirm:  [v => validators.match(v, form.password, 'Las contraseñas')],
+    };
+    const { isValid, errors: fieldErrors } = validateForm(form, rules);
+
+    if (!isValid) { setErrors(fieldErrors); return; }
+    if (!terms) { setErrors({ terms: 'Debes aceptar el reglamento para continuar' }); return; }
 
     setLoading(true);
-    const result = await register(form.name, form.email, form.password);
+    const result = await register(sanitize(form.name), form.email.trim(), form.password);
     if (result.success) {
       navigate('/');
     } else {
-      setError(result.error || 'Error al crear la cuenta');
+      setErrors({ email: result.error || 'Error al crear la cuenta' });
     }
     setLoading(false);
   };
@@ -79,58 +89,60 @@ const Register = () => {
             <p>Únete a la comunidad Sabana Market</p>
           </div>
 
-          {error && <div className="alert alert-error">{error}</div>}
-
           <form onSubmit={handleSubmit} className="auth-form" noValidate>
             <div className="form-group">
               <label className="form-label">Nombre completo</label>
-              <input type="text" className="input" placeholder="Tu nombre completo" value={form.name} onChange={set('name')} required />
+              <input type="text" className={`input ${errors.name ? 'error' : ''}`} placeholder="Tu nombre completo" value={form.name} onChange={set('name')} />
+              {errors.name && <span className="form-error">{errors.name}</span>}
             </div>
             <div className="form-group">
               <label className="form-label">Correo institucional</label>
-              <input type="email" className="input" placeholder="tu.nombre@unisabana.edu.co" value={form.email} onChange={set('email')} required />
+              <input type="email" className={`input ${errors.email ? 'error' : ''}`} placeholder="tu.nombre@unisabana.edu.co" value={form.email} onChange={set('email')} />
+              {errors.email && <span className="form-error">{errors.email}</span>}
             </div>
             <div className="form-group">
               <label className="form-label">Carrera</label>
-              <select className="input" value={form.career} onChange={set('career')}>
+              <select className={`input ${errors.career ? 'error' : ''}`} value={form.career} onChange={set('career')}>
                 <option value="">Selecciona tu carrera</option>
                 {CAREERS.map(c => <option key={c}>{c}</option>)}
               </select>
+              {errors.career && <span className="form-error">{errors.career}</span>}
             </div>
             <div className="form-group">
               <label className="form-label">Contraseña</label>
               <div className="pw-wrap">
                 <input
                   type={showPw ? 'text' : 'password'}
-                  className="input"
+                  className={`input ${errors.password ? 'error' : ''}`}
                   placeholder="Mínimo 6 caracteres"
                   value={form.password}
                   onChange={set('password')}
-                  required
                 />
                 <button type="button" className="pw-toggle" onClick={() => setShowPw(v => !v)}>
                   {showPw ? '🙈' : '👁️'}
                 </button>
               </div>
+              {errors.password && <span className="form-error">{errors.password}</span>}
             </div>
             <div className="form-group">
               <label className="form-label">Confirmar contraseña</label>
               <div className="pw-wrap">
                 <input
                   type={showPw ? 'text' : 'password'}
-                  className="input"
+                  className={`input ${errors.confirm ? 'error' : ''}`}
                   placeholder="Repite tu contraseña"
                   value={form.confirm}
                   onChange={set('confirm')}
-                  required
                 />
               </div>
+              {errors.confirm && <span className="form-error">{errors.confirm}</span>}
             </div>
             <div className="form-group" style={{ marginBottom: 12 }}>
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>
-                <input type="checkbox" checked={terms} onChange={e => setTerms(e.target.checked)} style={{ marginTop: 2, accentColor: 'var(--blue-dark)' }} />
+                <input type="checkbox" checked={terms} onChange={e => { setTerms(e.target.checked); if (errors.terms) setErrors(p => ({ ...p, terms: null })); }} style={{ marginTop: 2, accentColor: 'var(--blue-dark)' }} />
                 Acepto el reglamento de Sabana Market y las políticas institucionales
               </label>
+              {errors.terms && <span className="form-error">{errors.terms}</span>}
             </div>
 
             <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={loading}>
