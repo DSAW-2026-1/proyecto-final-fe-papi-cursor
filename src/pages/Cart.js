@@ -12,11 +12,16 @@ const Cart = () => {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [removedCount, setRemovedCount] = useState(0);
 
   const loadCart = useCallback(async () => {
     try {
       const res = await cartService.get();
-      setItems(res.data.items || res.data.cart?.items || []);
+      setItems(res.data.cart?.items || res.data.items || []);
+      // Mostrar aviso si el backend eliminó productos no disponibles
+      if (res.data.removedCount > 0) {
+        setRemovedCount(res.data.removedCount);
+      }
     } catch {}
     setLoading(false);
   }, []);
@@ -63,6 +68,12 @@ const Cart = () => {
     <div className="cart-page">
       <div className="container">
         <h1 className="cart-title">Mi Carrito</h1>
+
+        {removedCount > 0 && (
+          <div className="alert alert-error" style={{ marginBottom: 16 }}>
+            ⚠️ {removedCount} producto{removedCount > 1 ? 's' : ''} {removedCount > 1 ? 'fueron eliminados' : 'fue eliminado'} de tu carrito porque {removedCount > 1 ? 'ya no están disponibles' : 'ya no está disponible'}.
+          </div>
+        )}
 
         {items.length === 0 ? (
           <div className="cart-empty">
