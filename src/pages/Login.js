@@ -48,7 +48,12 @@ const Login = () => {
       const destination = roles.includes('admin') ? '/admin' : from;
       navigate(destination, { replace: true });
     } else {
-      setError(result.error || 'Correo o contraseña incorrectos');
+      // Mensaje especial si la cuenta está suspendida
+      if (result.suspended) {
+        setError(result.error);
+      } else {
+        setError(result.error || 'Correo o contraseña incorrectos');
+      }
     }
     setLoading(false);
   };
