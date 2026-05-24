@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { adminService } from '../services/api';
 
-// ── Panel de administración — HTML plano sin estilos (Prompt 2C) ──────────────
+// ── Panel de administración ───────────────────────────────────────────────────
 
 const Admin = () => {
   const { user } = useAuth();
@@ -11,7 +11,6 @@ const Admin = () => {
 
   const [tab, setTab] = useState('users');
 
-  // Redirigir si no es admin
   useEffect(() => {
     const isAdmin = user?.roles?.includes('admin') || user?.role === 'admin';
     if (!isAdmin) navigate('/');
@@ -143,6 +142,7 @@ const ProductsPanel = () => {
   const [products, setProducts] = useState([]);
   const [search, setSearch]     = useState('');
   const [msg, setMsg]           = useState('');
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const load = (q = '') => {
     adminService.getProducts(q)
@@ -157,14 +157,32 @@ const ProductsPanel = () => {
     load(search);
   };
 
+  // Separar productos activos de eliminados
+  const activeProducts  = products.filter(p => p.isActive);
+  const deletedProducts = products.filter(p => !p.isActive);
+
   const handleDelete = async (productId) => {
-    if (!window.confirm('¿Eliminar este producto?')) return;
+    if (!window.confirm('¿Eliminar este producto? Podrás restaurarlo después desde la sección de eliminados.')) return;
     try {
-      await adminService.deleteProduct(productId);
+      const res = await adminService.deleteProduct(productId);
       setMsg('Producto eliminado.');
-      setProducts(prev => prev.filter(p => p.id !== productId));
+      // Mover a eliminados en el estado local
+      const updated = res.data.product;
+      setProducts(prev => prev.map(p => p.id === productId ? (updated || { ...p, isActive: false }) : p));
     } catch (err) {
       setMsg(err.response?.data?.error || 'Error al eliminar');
+    }
+  };
+
+  const handleRestore = async (productId) => {
+    try {
+      const res = await adminService.restoreProduct(productId);
+      setMsg('Producto restaurado.');
+      // Mover a activos en el estado local
+      const updated = res.data.product;
+      setProducts(prev => prev.map(p => p.id === productId ? (updated || { ...p, isActive: true }) : p));
+    } catch (err) {
+      setMsg(err.response?.data?.error || 'Error al restaurar');
     }
   };
 
@@ -172,13 +190,10 @@ const ProductsPanel = () => {
     try {
       const res = await adminService.hideProduct(productId);
       setMsg(res.data.message);
-      // Actualizar el producto en el estado local directamente con la respuesta
-      // del servidor — sin necesidad de recargar toda la lista
       const updated = res.data.product;
       if (updated) {
         setProducts(prev => prev.map(p => p.id === productId ? updated : p));
       } else {
-        // Fallback: toggle optimista si el server no retorna el producto
         setProducts(prev => prev.map(p =>
           p.id === productId ? { ...p, hidden: !p.hidden } : p
         ));
@@ -201,11 +216,14 @@ const ProductsPanel = () => {
         />
         <button type="submit">Buscar</button>
       </form>
+
+      {/* ── Productos activos ── */}
+      <h3>Activos ({activeProducts.length})</h3>
       <ul>
-        {products.map(p => (
+        {activeProducts.map(p => (
           <li key={p.id}>
             <strong>{p.name}</strong> — ${p.price} — stock: {p.stock}
-            {' '}— {p.isActive ? 'activo' : 'inactivo'}{p.hidden ? ' — OCULTO' : ''}
+            {' '}— {p.hidden ? '🙈 OCULTO' : '👁️ visible'}
             <br />
             <button onClick={() => handleDelete(p.id)}>Eliminar</button>
             {' '}
@@ -214,8 +232,29 @@ const ProductsPanel = () => {
             </button>
           </li>
         ))}
-        {products.length === 0 && <li>Sin resultados.</li>}
+        {activeProducts.length === 0 && <li>Sin productos activos.</li>}
       </ul>
+
+      {/* ── Productos eliminados ── */}
+      <h3
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => setShowDeleted(v => !v)}
+      >
+        🗑️ Eliminados ({deletedProducts.length}) {showDeleted ? '▲' : '▼'}
+      </h3>
+      {showDeleted && (
+        <ul>
+          {deletedProducts.map(p => (
+            <li key={p.id} style={{ color: '#888' }}>
+              <strong>{p.name}</strong> — ${p.price} — stock: {p.stock}
+              {' '}— ❌ eliminado
+              <br />
+              <button onClick={() => handleRestore(p.id)}>♻️ Restaurar</button>
+            </li>
+          ))}
+          {deletedProducts.length === 0 && <li>Sin productos eliminados.</li>}
+        </ul>
+      )}
     </div>
   );
 };
@@ -266,5 +305,3 @@ const ReportsPanel = () => {
 };
 
 export default Admin;
-
-// ✅ Sección 2C — completada

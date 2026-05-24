@@ -123,6 +123,7 @@ export const adminService = {
   updateUserStatus:  (id, data) => api.put(`/admin/users/${id}/status`, data),
   getProducts:       (search) => api.get('/admin/products', { params: search ? { search } : {} }),
   deleteProduct:     (id) => api.delete(`/admin/products/${id}`),
+  restoreProduct:    (id) => api.patch(`/admin/products/${id}/restore`),
   hideProduct:       (id) => api.patch(`/admin/products/${id}/hide`),
   getOrders:         () => api.get('/admin/orders'),
   getReports:        (params) => api.get('/admin/reports', { params }),

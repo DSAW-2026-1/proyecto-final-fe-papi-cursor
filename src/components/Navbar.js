@@ -5,7 +5,7 @@ import { cartService, notificationService } from '../services/api';
 import './Navbar.css';
 
 const Navbar = () => {
-  const { user, logout, isAuthenticated, isSeller } = useAuth();
+  const { user, logout, isAuthenticated, isSeller, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [cartCount, setCartCount] = useState(0);
@@ -16,7 +16,7 @@ const Navbar = () => {
   const navRef = useRef(null);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isAdmin()) {
       loadCartCount();
       loadNotifications();
     }
@@ -65,7 +65,6 @@ const Navbar = () => {
   const toggleDropdown = (name) => {
     setOpenDropdown(prev => {
       const opening = prev !== name;
-      // Recargar notificaciones cada vez que se abre la campanita
       if (opening && name === 'notif' && isAuthenticated) {
         loadNotifications();
       }
@@ -74,9 +73,56 @@ const Navbar = () => {
   };
 
   const isActive = (path) => location.pathname === path;
-
   const notifIcons = { order: '📦', message: '💬', review: '⭐', info: 'ℹ️' };
 
+  // ── Navbar exclusivo para administrador ──────────────────────────────────────
+  // Solo muestra el logo (sin link) y el botón de cerrar sesión
+  if (isAuthenticated && isAdmin()) {
+    return (
+      <nav className="navbar" ref={navRef}>
+        <div className="nav-inner container">
+          {/* Logo sin enlace — admin no puede navegar al home */}
+          <div className="nav-logo" style={{ cursor: 'default', pointerEvents: 'none' }}>
+            <div className="nav-logo-icon">🎓</div>
+            <div className="nav-logo-text">
+              Sabana Market
+              <span>Panel de Administrador</span>
+            </div>
+          </div>
+
+          {/* Solo el avatar con opción de cerrar sesión */}
+          <div className="nav-actions">
+            <div className="nav-dropdown-wrap">
+              <div
+                className="nav-avatar"
+                onClick={() => toggleDropdown('user')}
+                title={user?.name}
+              >
+                {user?.name?.charAt(0).toUpperCase()}
+              </div>
+              {openDropdown === 'user' && (
+                <div className="nav-dropdown user-dropdown">
+                  <div className="user-dropdown-info">
+                    <div className="user-dropdown-name">{user?.name}</div>
+                    <div className="user-dropdown-email">{user?.email}</div>
+                    <div style={{ fontSize: 11, color: '#C9A84C', fontWeight: 600, marginTop: 2 }}>
+                      🛡️ Administrador
+                    </div>
+                  </div>
+                  <div className="user-dropdown-divider" />
+                  <button className="user-dropdown-link danger" onClick={handleLogout}>
+                    🚪 Cerrar sesión
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
+  // ── Navbar normal para compradores y vendedores ───────────────────────────────
   return (
     <nav className="navbar" ref={navRef}>
       <div className="nav-inner container">
