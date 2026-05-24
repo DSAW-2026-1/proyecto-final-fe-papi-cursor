@@ -375,41 +375,38 @@ const ProductDetail = () => {
 
           {/* Info del vendedor */}
           {product.seller && (
-            <div className="pd-seller">
-              <div className="pd-seller-avatar">👤</div>
-              <div style={{ flex: 1 }}>
-                <div className="pd-seller-name">{product.seller.name}</div>
-                <div className="pd-seller-email">{product.seller.email}</div>
+            <>
+              <div className="pd-seller">
+                <div className="pd-seller-avatar">👤</div>
+                <div>
+                  <div className="pd-seller-name">{product.seller.name}</div>
+                  <div className="pd-seller-email">{product.seller.email}</div>
 
-                {/* Rating del vendedor: solo si tiene ≥20 calificaciones */}
-                {sellerRating !== null ? (
-                  <div className="pd-seller-rating">
-                    <Stars rating={sellerRating} />
-                    <span style={{ marginLeft: 6, fontWeight: 600, color: '#C9A84C' }}>
-                      {sellerRating.toFixed(1)}
-                    </span>
-                    <span style={{ marginLeft: 4, color: 'var(--muted)', fontSize: 13 }}>
-                      · calificación del vendedor
-                    </span>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                    Sin calificación pública aún
-                  </div>
-                )}
+                  {/* Rating del vendedor: solo si tiene ≥20 calificaciones */}
+                  {sellerRating !== null ? (
+                    <div className="pd-seller-rating">
+                      <Stars rating={sellerRating} />
+                      <span style={{ marginLeft: 6, fontWeight: 600, color: '#C9A84C' }}>
+                        {sellerRating.toFixed(1)}
+                      </span>
+                      <span style={{ marginLeft: 4, color: 'var(--muted)', fontSize: 13 }}>
+                        · calificación del vendedor
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                      Sin calificación pública aún
+                    </div>
+                  )}
+                </div>
               </div>
-              {/* Botón reportar vendedor (solo para otros usuarios autenticados) */}
+              {/* Botón reportar vendedor — fuera del contenedor del seller */}
               {isAuthenticated && !isOwner && (
-                <button
-                  className="pd-report-link"
-                  style={{ alignSelf: 'flex-start', marginTop: 0 }}
-                  onClick={() => setShowUserReport(true)}
-                  title="Reportar vendedor"
-                >
-                  🚩 Reportar
+                <button className="pd-report-link" onClick={() => setShowUserReport(true)}>
+                  🚩 Reportar vendedor
                 </button>
               )}
-            </div>
+            </>
           )}
 
           {/* Acciones de compra */}
