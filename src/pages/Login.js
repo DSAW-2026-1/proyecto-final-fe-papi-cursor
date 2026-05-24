@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './Auth.css';
@@ -24,6 +24,13 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
+
+  // Mostrar mensaje de suspensión si viene redirigido desde el interceptor
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const suspended = params.get('suspended');
+    if (suspended) setError(decodeURIComponent(suspended));
+  }, [location.search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

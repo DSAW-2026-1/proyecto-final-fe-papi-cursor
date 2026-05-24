@@ -22,7 +22,7 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor para manejar errores de autenticación
+// Interceptor para manejar errores de autenticación y suspensión
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -31,6 +31,13 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
+    }
+    if (error.response?.status === 403 && error.response?.data?.suspended) {
+      // Cuenta suspendida: cerrar sesión y mostrar mensaje en login
+      const msg = encodeURIComponent(error.response.data.error || 'Tu cuenta ha sido suspendida.');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = `/login?suspended=${msg}`;
     }
     return Promise.reject(error);
   }
